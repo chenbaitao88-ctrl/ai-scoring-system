@@ -14,51 +14,29 @@ Excel、Word和CSV都从同一个权威结果服务生成。用户先选择评�
 
 文件不包含原始材料、路径、模型响应或评语。空白主观分表示快照未提供该值，不代表零分。Excel的数值保持数值类型，文本不会执行为公式；CSV对潜在公式前缀进行转义。Word为每个条目单独起页。
 
-下载不会自动推进任务生命周期，任务仍可显示 `export/pending`。当前没有新增结案UI；下面的演示用现有工单服务结案，不代表完成了在线评分流水线。
+下载不会自动推进任务生命周期，任务仍可显示 `export/pending`。工单结案是独立人工操作，不是评分、采用或锁定的附带动作。
 
 ## 离线复现一个可下载条目
 
-先按[首页](../README.md)启动演示。默认12个合成案例包含未采用和待复核状态，不应为演示下载而自动放行。下面命令只把 `DEMO-M-006` 的预置最终锁定对应工单结案，不改分数、不调用模型。它会修改所选演示目录里的这一份工单；其余案例继续展示阻断状态。请在仓库根目录执行，使用Python 3.11和锁定依赖。
+先按[首页](../README.md)启动演示。默认12个合成案例包含未采用和待复核状态，不会自动放行。以下操作只处理 `DEMO-M-006` 的预置最终锁定对应工单，不改分数、不调用模型；其余条目继续保留原状态。
 
-```bash
-uv run --frozen python - <<'PY'
-import json
-import os
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
+1. 在“结果导出”选择合成评分任务，先查看“复核工单尚未结案”的阻断说明。任务ID也可从本地合成清单 `runtime/demo/data/demo_phase11_manifest.json` 的 `scoring_task_id` 字段取得。
+2. 打开“评分流水线”，输入该任务ID并查询，切到“复核队列”。
+3. 打开状态为“复核中”、已有77分采用结果与最终锁定的工单，核对评分历史及采用/锁定信息，点击独立按钮“确认复核并结案”。
+4. 页面显示结案结果并重新检查该条目导出资格。若仍有其他阻断，按结果页原因继续处理；结案不保证所有条目都可导出。
+5. 回到“结果导出”，刷新或重新选择任务，勾选该已锁定条目，下载三种文件。
 
-sys.path.insert(0, str(Path.cwd() / "backend"))
-from services.score_attempt_store import ScoreAttemptStore
-from services.review_case_store import ReviewCaseStore
+2026-09-08合成浏览器实测：总分77，维度分17、23、22、15，三个下载文件与权威结果API的分数和版本ID一致。本步骤不验证真实模型重新评分。
 
-data = Path(os.environ.get("SCORING_DATA_DIR", "runtime/demo/data")).resolve()
-manifest = json.loads((data / "demo_phase11_manifest.json").read_text())
-if manifest.get("source") != "offline_synthetic" or manifest.get("provider_calls") != 0:
-    raise SystemExit("Only the offline synthetic demo is supported.")
-item = next(row for row in manifest["items"] if row["team_code"] == "DEMO-M-006")
-task_id, item_id = manifest["scoring_task_id"], item["scoring_item_id"]
-root = data / "pipeline-runtime"
-attempts = ScoreAttemptStore(root / "score-attempts")
-reviews = ReviewCaseStore(root / "reviews", attempt_store=attempts)
-case = reviews.get_review_case(task_id, item_id, item["review_case_id"])
-lock = reviews.get_active_final_lock(task_id, item_id)
-if lock is None or lock.review_case_id != case.review_case_id:
-    raise SystemExit("The expected demo final lock is missing; no changes made.")
-if case.status != "resolved":
-    if case.status != "in_review":
-        raise SystemExit("Unexpected case state; no changes made.")
-    reviews.transition_review_case(
-        task_id, item_id, case.review_case_id,
-        expected_revision=case.current_revision, to_status="resolved",
-        event_type="CASE_RESOLVED", actor=lock.locked_by,
-        occurred_at=datetime.now(timezone.utc), resolution_decision_id=lock.decision_id,
-    )
-print({"task_id": task_id, "item_id": item_id, "status": "resolved"})
-PY
-```
+## 受限结案接口
 
-回到结果页刷新，选中已锁定条目，分别下载三种文件。2026-09-08实测该预置条目总分77，维度分为17、23、22、15；三个文件与权威结果API一致。其他条目不会被这一命令采用或结案。
+`POST /api/scoring-pipeline/tasks/{task_id}/items/{item_id}/review-cases/{case_id}/resolve`
+
+请求仅含 `expected_revision`（正整数）和 `expected_adoption_id`（页面看到的当前采用ID）。后端在现有review-store条目锁内解析采用所依据的决定，核验工单、决定、采用、评分事实和可选最终锁定的绑定，再执行 `in_review → resolved`，记录revision及 `CASE_RESOLVED`。不接受任意目标状态、客户端分数或客户端指定的结案决定。
+
+成功200返回工单ID、状态、新revision和结案决定ID。无效请求400、工单或决定不存在404、版本过期/已结案/采用变化/评分事实无效409。重复提交不追加事件，返回冲突后应刷新；锁定动作不会自动结案。仅支持当前工单版本上的有效人工采用决定，或有完整关联记录的人工调分决定。已重开的工单须重新复核，不能沿用旧结案决定。
+
+关联校验与工单写入共享review-store的条目锁；attempt-store独立，不承诺跨存储原子事务。未改变 `must_review` 的自动采用保护、最终锁定或其他工单的导出阻断。
 
 ## API兼容
 

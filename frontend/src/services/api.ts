@@ -961,6 +961,15 @@ export interface ReviewCaseReopenResponse {
 }
 
 export const scoringPipelineApi = {
+  resolveReviewCase: (
+    taskId: string, itemId: string, caseId: string,
+    body: { expected_revision: number; expected_adoption_id: string },
+  ): Promise<{ review_case_id: string; status: string; current_revision: number; resolution_decision_id: string }> =>
+    api.post(
+      `/scoring-pipeline/tasks/${encodeURIComponent(taskId)}/items/${encodeURIComponent(itemId)}/review-cases/${encodeURIComponent(caseId)}/resolve`,
+      body,
+    ),
+
   createTask: (body: CreateScoringPipelineTaskRequest): Promise<ScoringPipelineTaskSummary> =>
     api.post('/scoring-pipeline/tasks', body),
 

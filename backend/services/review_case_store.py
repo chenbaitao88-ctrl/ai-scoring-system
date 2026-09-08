@@ -42,7 +42,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from models.review_case import (
     ADOPTION_TERMINAL,
@@ -460,6 +460,7 @@ class ReviewCaseStore:
         assigned_to=None,
         assignment_group: Optional[str] = None,
         package_revision: Optional[int] = None,
+        _resolution_guard: Optional[Callable[[ReviewCase], str]] = None,
     ) -> ReviewCase:
         """推进 ReviewCase 状态（CAS revision + 合法转换 + 状态事件；重开保留旧 resolution）。
 
@@ -486,6 +487,11 @@ class ReviewCaseStore:
                 raise ReviewFactStoreError(ERR_CASE_CONFLICT, retryable=False)
             if not can_transition_case(current.status, to_status):
                 raise ReviewFactStoreError(ERR_CASE_CONFLICT, retryable=False)
+            if _resolution_guard is not None:
+                # Internal resolution only: related review facts stay under this same item lock.
+                if current.status != "in_review" or to_status != "resolved":
+                    raise ReviewFactStoreError(ERR_CASE_CONFLICT, retryable=False)
+                resolution_decision_id = _resolution_guard(current)
             if to_status in ("resolved", "dismissed") and resolution_decision_id is None:
                 raise ReviewFactStoreError(ERR_BINDING_MISMATCH, retryable=False)
 

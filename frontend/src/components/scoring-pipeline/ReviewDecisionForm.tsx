@@ -44,6 +44,10 @@ export interface ReviewDecisionFormProps {
   /** 锁定状态 */
   locking: boolean;
   lockError: string | null;
+  resolving: boolean;
+  resolveError: string | null;
+  resolveSuccess: string | null;
+  onResolveCase: () => void;
   /** 是否已有活跃 adoption */
   hasActiveAdoption: boolean;
   /** 是否已锁定 */
@@ -70,6 +74,10 @@ export default function ReviewDecisionForm({
   applyError,
   locking,
   lockError,
+  resolving,
+  resolveError,
+  resolveSuccess,
+  onResolveCase,
   hasActiveAdoption,
   hasActiveLock,
   onCreateDecision,
@@ -189,7 +197,7 @@ export default function ReviewDecisionForm({
         <button
           data-testid="review-decision-create"
           className="w-full rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:bg-teal-300"
-          disabled={creating || applying || locking || reasonCodes.length === 0}
+          disabled={creating || applying || locking || resolving || reasonCodes.length === 0}
           onClick={handleCreate}
         >
           {creating ? '创建中...' : '创建复核决定'}
@@ -211,7 +219,7 @@ export default function ReviewDecisionForm({
           <button
             data-testid="review-decision-apply"
             className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-300"
-            disabled={creating || applying || locking}
+            disabled={creating || applying || locking || resolving}
             onClick={onApplyAdoption}
           >
             {applying ? '采用中...' : '采用结果'}
@@ -228,7 +236,7 @@ export default function ReviewDecisionForm({
           <button
             data-testid="review-decision-lock"
             className="w-full rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:bg-amber-300"
-            disabled={creating || applying || locking}
+            disabled={creating || applying || locking || resolving}
             onClick={onLockResult}
           >
             {locking ? '锁定中...' : '锁定结果'}
@@ -244,6 +252,26 @@ export default function ReviewDecisionForm({
             {lockError}
           </div>
         )}
+        <div className="space-y-2 border-t border-gray-200 pt-3">
+          <p className="text-xs text-gray-600">
+            核对已采用结果后可确认结案。系统会核验当前工单与评分记录；其他阻断工单仍需处理。
+          </p>
+          <button
+            type="button"
+            data-testid="review-case-resolve"
+            className="w-full rounded bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:bg-gray-300"
+            disabled={detail.case.status !== 'in_review' || !hasActiveAdoption || creating || applying || locking || resolving}
+            onClick={onResolveCase}
+          >
+            {resolving ? '结案中...' : detail.case.status === 'resolved' ? '工单已结案' : '确认复核并结案'}
+          </button>
+          {detail.case.status !== 'in_review' && detail.case.status !== 'resolved' && (
+            <p className="text-xs text-gray-500">仅“复核中”工单支持本次结案操作。</p>
+          )}
+          {!hasActiveAdoption && <p className="text-xs text-gray-500">需要先完成采用结果。</p>}
+          {resolveError && <div role="alert" data-testid="review-case-resolve-error" className="text-sm text-red-700">{resolveError}</div>}
+          {resolveSuccess && <div role="status" data-testid="review-case-resolve-success" className="text-sm text-teal-800">{resolveSuccess}</div>}
+        </div>
       </div>
     </div>
   );

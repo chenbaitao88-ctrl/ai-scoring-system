@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   AddIcon,
@@ -15,6 +15,7 @@ import ManualAdjustmentForm from '../components/scoring-pipeline/ManualAdjustmen
 import EvidenceReopenPanel from '../components/scoring-pipeline/EvidenceReopenPanel';
 import {
   ApiRequestError,
+  authoritativeExportApi,
   scoringPipelineApi,
 } from '../services/api';
 import type {
@@ -207,6 +208,10 @@ export default function ScoringPipeline() {
 
   // 11F-2c：复核详情
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const selectedCaseContext = useRef<string | null>(null);
+  const selectionEpoch = useRef(0);
+  const detailRequest = useRef(0);
+  const loadedTaskId = useRef<string | null>(null);
   const [caseDetail, setCaseDetail] = useState<ReviewCaseDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -218,6 +223,10 @@ export default function ScoringPipeline() {
   const [applyError, setApplyError] = useState<string | null>(null);
   const [locking, setLocking] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const resolutionBusy = useRef(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [resolveSuccess, setResolveSuccess] = useState<string | null>(null);
   const [decisionKeyCounter, setDecisionKeyCounter] = useState(0);
   const [adjustmentRequestId, setAdjustmentRequestId] = useState('');
   const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
@@ -248,11 +257,16 @@ export default function ScoringPipeline() {
       return;
     }
     setBusyAction('load');
+    if (loadedTaskId.current !== normalized) {
+      handleCloseDetail();
+      loadedTaskId.current = normalized;
+    }
     try {
       const [taskResponse, itemResponse] = await Promise.all([
         scoringPipelineApi.getTask(normalized),
         scoringPipelineApi.listItems(normalized),
       ]);
+      if (loadedTaskId.current !== normalized) return;
       setTask(taskResponse);
       setItems(itemResponse.items);
       setTaskIdInput(taskResponse.task_id);
@@ -275,6 +289,7 @@ export default function ScoringPipeline() {
     setReviewError(null);
     try {
       const response = await scoringPipelineApi.listReviewCases(task.task_id, filters);
+      if (loadedTaskId.current !== task.task_id) return;
       setReviewCases(response.items);
       setReviewTotal(response.total);
     } catch (error) {
@@ -305,7 +320,13 @@ export default function ScoringPipeline() {
 
   // 11F-2c：选中工单加载详情
   const handleSelectCase = async (caseId: string | null) => {
+    const context = caseId && task ? `${task.task_id}/${caseId}` : null;
+    if (selectedCaseContext.current !== context) selectionEpoch.current += 1;
+    selectedCaseContext.current = context;
+    const request = ++detailRequest.current;
     if (caseId !== selectedCaseId) {
+      setResolveError(null);
+      setResolveSuccess(null);
       setAdjustmentRequestId(caseId ? `adjust-${caseId}-${Date.now()}` : '');
       setAdjustmentError(null);
       setAdjustmentSuccess(null);
@@ -323,15 +344,22 @@ export default function ScoringPipeline() {
     setCaseDetail(null);
     try {
       const detail = await scoringPipelineApi.getReviewCaseDetail(task.task_id, caseId);
+      if (request !== detailRequest.current || context !== selectedCaseContext.current) return;
       setCaseDetail(detail);
     } catch (error) {
-      setDetailError(safeNotice(error).title);
+      if (request === detailRequest.current) setDetailError(safeNotice(error).title);
     } finally {
-      setDetailLoading(false);
+      if (request === detailRequest.current) setDetailLoading(false);
     }
   };
 
   const handleCloseDetail = () => {
+    selectedCaseContext.current = null;
+    selectionEpoch.current += 1;
+    detailRequest.current += 1;
+    setDetailLoading(false);
+    setResolveError(null);
+    setResolveSuccess(null);
     setSelectedCaseId(null);
     setCaseDetail(null);
     setDetailError(null);
@@ -537,6 +565,55 @@ export default function ScoringPipeline() {
     }
   };
 
+  const handleResolveCase = async () => {
+    if (!task || !caseDetail?.active_adoption || resolutionBusy.current) return;
+    resolutionBusy.current = true;
+    setResolving(true);
+    setResolveError(null);
+    setResolveSuccess(null);
+    const { item_id: itemId, review_case_id: caseId, current_revision: revision } = caseDetail.case;
+    const context = `${task.task_id}/${caseId}`;
+    const epoch = selectionEpoch.current;
+    const isCurrent = () => selectedCaseContext.current === context && selectionEpoch.current === epoch;
+    try {
+      await scoringPipelineApi.resolveReviewCase(task.task_id, itemId, caseId, {
+        expected_revision: revision,
+        expected_adoption_id: caseDetail.active_adoption.adoption_id,
+      });
+      if (!isCurrent()) return;
+      setResolveSuccess('工单已结案，正在刷新导出资格。');
+      try {
+        const [, , preview] = await Promise.all([
+          handleSelectCase(caseId), loadReviewCases(reviewFilters),
+          authoritativeExportApi.results(task.task_id),
+        ]);
+        if (!isCurrent()) return;
+        const result = preview.items.find(item => item.item_id === itemId);
+        setResolveSuccess(result?.exportable
+          ? '工单已结案，此条目可到结果页导出。'
+          : '工单已结案，此条目仍有导出阻断，请到结果页查看原因。');
+      } catch {
+        if (isCurrent()) setResolveSuccess('工单已结案；导出资格刷新失败，请到结果页刷新确认。');
+      }
+    } catch (error) {
+      if (!isCurrent()) return;
+      const code = error instanceof ApiRequestError ? error.code : null;
+      const messages: Record<string, string> = {
+        REVIEW_CASE_CONFLICT: '工单状态或版本已变化，请刷新工单后确认。',
+        REVIEW_RESOLUTION_ADOPTION_CHANGED: '采用结果已变化，请刷新并重新核对。',
+        REVIEW_RESOLUTION_ADOPTION_REQUIRED: '尚无有效采用结果，不能结案。',
+        REVIEW_RESOLUTION_BINDING_MISMATCH: '工单、决定与已采用或锁定结果不一致，不能结案。',
+        REVIEW_RESOLUTION_DECISION_STALE: '采用所依据的复核决定已过期，请重新复核。',
+        REVIEW_RESOLUTION_SCORE_FACT_INVALID: '评分记录或校验结果缺失、损坏或不一致，不能结案。',
+        REVIEW_DECISION_NOT_FOUND: '采用所依据的复核决定不存在，不能结案。',
+      };
+      setResolveError((code && messages[code]) || safeNotice(error).title);
+    } finally {
+      resolutionBusy.current = false;
+      setResolving(false);
+    }
+  };
+
   const handleCreate = async () => {
     const validationError = validateCreateForm(createForm);
     if (validationError) {
@@ -556,6 +633,8 @@ export default function ScoringPipeline() {
       const created = await scoringPipelineApi.createTask(request);
       const itemResponse = await scoringPipelineApi.listItems(created.task_id);
       setTask(created);
+      loadedTaskId.current = created.task_id;
+      handleCloseDetail();
       setItems(itemResponse.items);
       setTaskIdInput(created.task_id);
       setSelectedItemId(null);
@@ -941,6 +1020,10 @@ export default function ScoringPipeline() {
                     applyError={applyError}
                     locking={locking}
                     lockError={lockError}
+                    resolving={resolving}
+                    resolveError={resolveError}
+                    resolveSuccess={resolveSuccess}
+                    onResolveCase={handleResolveCase}
                     hasActiveAdoption={!!caseDetail.active_adoption}
                     hasActiveLock={!!caseDetail.active_lock}
                     onCreateDecision={handleCreateDecision}

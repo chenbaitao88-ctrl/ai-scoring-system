@@ -36,6 +36,7 @@ from services.scoring_pipeline_orchestrator import (
     ScoreRecoveryResult,
 )
 from services.scoring_task_creator import ScoringTaskCreator
+from test_review_case_resolution import env, resolution_env, mount_resolution_api, facts
 
 
 class BindingLookup:
@@ -646,3 +647,41 @@ def test_api_does_not_import_or_write_legacy_score_models():
     sources = inspect.getsource(scoring_pipeline) + inspect.getsource(ScoringPipelineApiContainer)
     for forbidden in ("MachineScore", "HumanScore", "FinalScore", "SessionLocal", "database"):
         assert forbidden not in sources
+
+
+@pytest.mark.parametrize("body,status,code", [
+    ({"expected_revision": 1, "expected_adoption_id": "adp_demo_001"}, 200, None),
+    ({"expected_revision": 9, "expected_adoption_id": "adp_demo_001"}, 409, "REVIEW_CASE_CONFLICT"),
+    ({"expected_revision": 1, "expected_adoption_id": "stale"}, 409, "REVIEW_RESOLUTION_ADOPTION_CHANGED"),
+    ({"expected_revision": 1, "expected_adoption_id": "../unsafe"}, 400, "SCORING_PIPELINE_REQUEST_INVALID"),
+    ({"expected_revision": True, "expected_adoption_id": "adp_demo_001"}, 400, "SCORING_PIPELINE_REQUEST_INVALID"),
+    ({"expected_revision": 1, "expected_adoption_id": "adp_demo_001", "to_status": "dismissed"}, 400, "SCORING_PIPELINE_REQUEST_INVALID"),
+])
+def test_restricted_resolution_http_contract(resolution_env, body, status, code):
+    e = resolution_env
+    url = mount_resolution_api(e)
+    before = facts(e)
+    response = e.client.post(url, json=body)
+    assert response.status_code == status, response.text
+    if code is not None:
+        assert response.json()["error"]["code"] == code
+        assert str(e.root) not in response.text
+        assert facts(e) == before
+    else:
+        assert response.json()["status"] == "resolved"
+        assert response.json()["current_revision"] == 2
+        assert response.json()["resolution_decision_id"] == "dec_demo_001"
+
+
+def test_resolution_http_missing_case_and_repeat_are_safe(resolution_env):
+    e = resolution_env
+    url = mount_resolution_api(e)
+    body = {"expected_revision": 1, "expected_adoption_id": "adp_demo_001"}
+    before = facts(e)
+    response = e.client.post(url.replace("rev_demo_001", "missing-case"), json=body)
+    assert response.status_code == 404
+    assert facts(e) == before
+    assert e.client.post(url, json=body).status_code == 200
+    after = facts(e)
+    assert e.client.post(url, json=body).status_code == 409
+    assert facts(e) == after

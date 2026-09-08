@@ -24,6 +24,7 @@ from services.scoring_pipeline_api_container import (
     assemble_non_provider_scoring_api_container,
 )
 from services.review_case_store import ReviewFactStoreError
+from services.review_case_resolution_service import ReviewCaseResolutionService, ReviewResolutionError
 from services.scoring_pipeline_orchestrator import (
     ReviewApplicationResult,
     ScoreRecoveryResult,
@@ -672,6 +673,45 @@ def list_review_cases(
             for c in cases
         ]
         return ReviewCaseListResponse(task_id=task_id, total=len(items), items=items).model_dump(mode="json")
+    except Exception as exc:
+        return _exception_response(exc, request_id)
+
+
+class ReviewCaseResolveBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1, strict=True)
+    expected_adoption_id: str
+    _adoption_id = field_validator("expected_adoption_id", mode="after")(_safe_id)
+
+
+@router.post("/tasks/{task_id}/items/{item_id}/review-cases/{case_id}/resolve")
+def resolve_review_case(
+    task_id: str, item_id: str, case_id: str, body: ReviewCaseResolveBody,
+    request: Request = None,
+    container: ScoringPipelineApiContainer = Depends(get_scoring_pipeline_api_container),
+):
+    """Resolve only an in-review case backed by its current human adoption."""
+    request_id = _request_id(request)
+    try:
+        for value in (task_id, item_id, case_id):
+            try:
+                _safe_id(value)
+            except ValueError:
+                return _error_response(400, ERR_REQUEST_INVALID, request_id=request_id)
+        _require_item(container, task_id, item_id)
+        service = ReviewCaseResolutionService(container.require_review_store(), container.require_attempt_store())
+        case = service.resolve(
+            task_id, item_id, case_id, expected_revision=body.expected_revision,
+            expected_adoption_id=body.expected_adoption_id,
+            actor=_LOCAL_REVIEWER_REF, occurred_at=datetime.now(timezone.utc),
+        )
+        return {
+            "review_case_id": case.review_case_id, "status": case.status,
+            "current_revision": case.current_revision,
+            "resolution_decision_id": case.resolution_decision_id,
+        }
+    except ReviewResolutionError as exc:
+        return _error_response(exc.status_code, exc.error_code, request_id=request_id)
     except Exception as exc:
         return _exception_response(exc, request_id)
 

@@ -222,3 +222,33 @@ def test_pagination_does_not_drop_later_scoring_tasks(env):
     tasks = [evidence] * 205 + [env.task]
     env.manager.list_tasks = lambda offset, limit: tasks[offset:offset + limit]
     assert env.service.list_tasks()[0]["task_id"] == TASK
+
+
+@pytest.mark.parametrize("fmt,alias", FORMATS)
+def test_resolve_http_action_unblocks_same_authoritative_file(env, fmt, alias):
+    from test_review_case_resolution import seed_resolution, mount_resolution_api
+    seed_resolution(env)
+    url = mount_resolution_api(env)
+    env.reviews.create_final_lock(TASK, ITEM, rc.make_lock(task_id=TASK, item_id=ITEM))
+    assert env.client.get(alias, params={"task_id": TASK}).status_code == 409
+    response = env.client.post(url, json={"expected_revision": 1, "expected_adoption_id": rc.ADP})
+    assert response.status_code == 200, response.text
+    expected = env.client.post(f"/api/result-export/tasks/{TASK}/items/{ITEM}/derive").json()
+    exported = env.client.get(alias, params={"task_id": TASK})
+    assert exported.status_code == 200
+    row = score_row(fmt, exported.content)
+    assert float(row["总分"]) == expected["result"]["total_score"] == 82
+    assert row["结果版本"] == expected["result"]["snapshot_id"]
+    assert row["评分尝试"] == expected["result"]["attempt_id"]
+    assert row["推导编号"] == expected["derivation_id"]
+
+
+def test_resolving_one_case_keeps_other_case_export_block(env):
+    from test_review_case_resolution import seed_resolution, mount_resolution_api
+    seed_resolution(env)
+    url = mount_resolution_api(env)
+    env.reviews.create_review_case(TASK, ITEM, rc.make_case(review_case_id=rc.REV2))
+    assert env.client.post(url, json={"expected_revision": 1, "expected_adoption_id": rc.ADP}).status_code == 200
+    response = env.client.post(f"/api/result-export/tasks/{TASK}/items/{ITEM}/derive")
+    assert response.status_code == 409
+    assert response.json()["error"]["reasons"] == [{"code": "UNRESOLVED_REVIEW_CASE", "count": 1, "statuses": ["open"]}]
