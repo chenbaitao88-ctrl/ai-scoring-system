@@ -5,38 +5,33 @@
 - 数据备份
 """
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
 from services.export_service import (
-    build_excel_export,
-    build_word_export,
     get_score_summary_dict,
     create_backup,
 )
+from typing import Optional, List
+from routers.result_export import get_authoritative_export_service, export_file_response
+from services.authoritative_export_service import AuthoritativeExportService
 
 router = APIRouter()
 
 @router.get("/excel")
-async def export_excel(db: Session = Depends(get_db)):
-    """导出评分汇总Excel"""
-    export_path, filename = build_excel_export(db)
-    return FileResponse(
-        path=export_path,
-        filename=filename,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+async def export_excel(
+    task_id: Optional[str] = Query(default=None), item_id: Optional[List[str]] = Query(default=None),
+    service: AuthoritativeExportService = Depends(get_authoritative_export_service),
+):
+    """兼容旧URL，但只允许显式任务范围内的权威结果。"""
+    return export_file_response(service, task_id, "xlsx", item_id)
 
 @router.get("/word")
-async def export_word(db: Session = Depends(get_db)):
-    """导出Word现场记录表"""
-    export_path, filename = build_word_export(db)
-    return FileResponse(
-        path=export_path,
-        filename=filename,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+async def export_word(
+    task_id: Optional[str] = Query(default=None), item_id: Optional[List[str]] = Query(default=None),
+    service: AuthoritativeExportService = Depends(get_authoritative_export_service),
+):
+    return export_file_response(service, task_id, "docx", item_id)
 
 @router.get("/score-summary")
 async def get_score_summary(db: Session = Depends(get_db)):

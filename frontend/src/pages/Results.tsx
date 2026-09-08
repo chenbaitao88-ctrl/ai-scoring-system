@@ -3,6 +3,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { exportApi, scoreApi } from '../services/api';
+import AuthoritativeResults from '../components/AuthoritativeResults';
 
 interface ScoreSummary {
   total_teams: number;
@@ -44,10 +45,20 @@ interface ScoreSummary {
 }
 
 export default function Results() {
+  return <div className="space-y-6">
+    <AuthoritativeResults />
+    <details className="bg-white rounded-lg shadow-sm p-4">
+      <summary className="cursor-pointer font-semibold">历史综合分参考（不作为权威导出来源）</summary>
+      <p className="text-sm text-gray-600 my-3">以下保留旧版综合分与加权计算，便于追溯。正式文件请在上方选择评分任务后导出。</p>
+      <LegacyResults />
+    </details>
+  </div>;
+}
+
+function LegacyResults() {
   const [summary, setSummary] = useState<ScoreSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
-  const [exporting, setExporting] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'primary' | 'middle'>('all');
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
 
@@ -77,38 +88,6 @@ export default function Results() {
       alert(err.message || '计算失败');
     }
     setCalculating(false);
-  };
-
-  const handleExportExcel = async () => {
-    setExporting('excel');
-    try {
-      const blob = await exportApi.exportExcel() as unknown as Blob;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `评分汇总_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(err.message || '导出失败');
-    }
-    setExporting(null);
-  };
-
-  const handleExportWord = async () => {
-    setExporting('word');
-    try {
-      const blob = await exportApi.exportWord() as unknown as Blob;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `评分汇总_${new Date().toISOString().slice(0, 10)}.docx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(err.message || '导出失败');
-    }
-    setExporting(null);
   };
 
   const filteredResults = summary?.results.filter(r => {
@@ -146,20 +125,6 @@ export default function Results() {
             className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
           >
             {calculating ? '计算中...' : '计算综合评分'}
-          </button>
-          <button
-            onClick={handleExportExcel}
-            disabled={exporting !== null || summary.with_final_score === 0}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-          >
-            {exporting === 'excel' ? '导出中...' : '导出Excel'}
-          </button>
-          <button
-            onClick={handleExportWord}
-            disabled={exporting !== null || summary.with_final_score === 0}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {exporting === 'word' ? '导出中...' : '导出Word'}
           </button>
           <button
             onClick={loadSummary}

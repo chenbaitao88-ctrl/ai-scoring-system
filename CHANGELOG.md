@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-08 — Authoritative file exports
+
+- Route XLSX, DOCX and CSV through the same task-scoped adoption/final-lock derivation.
+- Reject unresolved cases, missing facts, incomplete task manifests and stale result versions; never fall back to legacy weighted scores.
+- Add task preview, explicit selection, version-aware downloads and mobile navigation.
+- Keep legacy download URLs as task_id-required compatibility routes (409 without a task).
+- Add durable-fact and real-file regression tests, offline browser checks and export documentation.
+
 ## 1.0.2 - 2026-09-01
 
 - Refreshed the six-model multimodal catalog shown in the scoring interface.

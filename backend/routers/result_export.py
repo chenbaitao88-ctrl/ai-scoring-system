@@ -1,10 +1,7 @@
-"""Authoritative result export readiness API (Phase 11F-3e-2).
+"""Authoritative result preview and task-scoped Excel/Word/CSV export.
 
-Exposes the ResultDerivationService derive boundary as a stable HTTP API.
-This router never calls a Provider, never reads .env, never writes the
-database, and never generates Excel/Word/CSV export files.  Responses are
-redacted: no input_fingerprint, prompts, provider payloads, evidence or
-rationale text, file paths, or personal information.
+All files use the same derivation boundary. No Provider or legacy database
+scores are used; only redacted identifiers, authority and scores leave it.
 """
 from __future__ import annotations
 
@@ -12,8 +9,9 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 from routers.pipeline_tasks import get_pipeline_task_manager
 from services.pipeline_task_manager import PipelineTaskManager
@@ -24,6 +22,9 @@ from services.result_derivation_service import (
 )
 from services.review_case_store import ReviewCaseStore
 from services.score_attempt_store import ScoreAttemptStore
+from services.authoritative_export_service import (
+    AuthoritativeExportError, AuthoritativeExportService, ExportFormat, require_task_id,
+)
 
 RESULT_EXPORT_REQUEST_INVALID = "RESULT_EXPORT_REQUEST_INVALID"
 RESULT_EXPORT_INTERNAL_ERROR = "RESULT_EXPORT_INTERNAL_ERROR"
@@ -73,6 +74,85 @@ def get_result_derivation_service(
         root=runtime_root,
     )
     return service
+
+
+def get_authoritative_export_service(
+    manager: PipelineTaskManager = Depends(get_pipeline_task_manager),
+    derivation: ResultDerivationService = Depends(get_result_derivation_service),
+) -> AuthoritativeExportService:
+    return AuthoritativeExportService(manager, derivation)
+
+
+def _export_error(exc: Exception) -> JSONResponse:
+    if isinstance(exc, AuthoritativeExportError):
+        return JSONResponse(status_code=exc.status, content={
+            "exportable": False,
+            "error": {"code": exc.code, "message_key": exc.message},
+            "blocked_items": exc.blocked_items,
+        }, headers={"Cache-Control": "no-store"})
+    return JSONResponse(status_code=409, content={
+        "exportable": False,
+        "error": {"code": "EXPORT_SOURCE_UNAVAILABLE", "message_key": "结果记录不可用，已阻止导出。请检查任务记录后重试。"},
+    }, headers={"Cache-Control": "no-store"})
+
+
+def export_file_response(service: AuthoritativeExportService, task_id: Optional[str],
+                         fmt: ExportFormat, item_ids: Optional[List[str]] = None,
+                         expected_derivations: Optional[Dict[str, str]] = None):
+    try:
+        task_id = require_task_id(task_id)
+        payload = service.export(task_id, fmt, item_ids, expected_derivations)
+    except Exception as exc:
+        return _export_error(exc)
+    media_types = {
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "csv": "text/csv; charset=utf-8",
+    }
+    return Response(payload, media_type=media_types[fmt], headers={
+        "Content-Disposition": f'attachment; filename="authoritative-results-{task_id}.{fmt}"',
+        "Cache-Control": "no-store",
+    })
+
+
+@router.get("/tasks")
+def list_export_tasks(service: AuthoritativeExportService = Depends(get_authoritative_export_service)):
+    try:
+        return JSONResponse({"items": service.list_tasks()}, headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        return _export_error(exc)
+
+
+@router.get("/tasks/{task_id}/results")
+def preview_task_results(task_id: str, service: AuthoritativeExportService = Depends(get_authoritative_export_service)):
+    try:
+        return JSONResponse(service.preview(task_id), headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        return _export_error(exc)
+
+
+@router.get("/tasks/{task_id}/export")
+def export_task_results(
+    task_id: str, format: ExportFormat = Query(default="xlsx"),
+    item_id: Optional[List[str]] = Query(default=None),
+    service: AuthoritativeExportService = Depends(get_authoritative_export_service),
+):
+    return export_file_response(service, task_id, format, item_id)
+
+
+class ExportTaskRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    format: ExportFormat = "xlsx"
+    item_ids: Optional[List[str]] = Field(default=None, min_length=1)
+    expected_derivations: Optional[Dict[str, str]] = None
+
+
+@router.post("/tasks/{task_id}/export")
+def export_selected_results(
+    task_id: str, body: ExportTaskRequest,
+    service: AuthoritativeExportService = Depends(get_authoritative_export_service),
+):
+    return export_file_response(service, task_id, body.format, body.item_ids, body.expected_derivations)
 
 
 def _error_body(

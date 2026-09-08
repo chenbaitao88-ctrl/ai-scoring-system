@@ -73,3 +73,9 @@ npm run build --prefix frontend
 - 服务启动失败：查看 runtime/demo/backend.log，保留错误原因，不通过关闭校验绕过问题。
 
 当前实测平台与结果见[验证说明](VALIDATION.md)。[模型配置](CONFIGURATION.md) · [返回首页](../README.md)
+
+## 已确认结果导出
+
+打开“结果导出”，选择评分任务、勾选可导出条目，再下载Excel、Word或CSV。默认合成案例保留待处理工单，因此不一定有可导出项；[导出说明](EXPORTS.md)提供受限于合成数据的结案复现步骤。旧下载接口不带task_id会返回409，这是保护条件。
+
+Word指定平台中文字体：macOS为Heiti SC、Windows为Microsoft YaHei、Linux为Noto Sans CJK SC。无界面文档转换环境必须能找到相应中文字体；文件未嵌入字体。

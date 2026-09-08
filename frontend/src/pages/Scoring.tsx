@@ -3,6 +3,7 @@
  * 评委对队伍进行四维度打分
  */
 import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { scoreApi, judgeGroupApi, competitionApi } from '../services/api';
 import type { DimensionConfig } from '../services/api';
 import { ScoringFilterBar, ScoringTeamList, AIDisplaySection, ScoreHistorySection } from '../components/scoring';
@@ -80,6 +81,7 @@ interface GroupConfig {
 }
 
 export default function Scoring() {
+  const navigate = useNavigate();
   const [judgeName, setJudgeName] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [shortCodeFilter, setShortCodeFilter] = useState('');
@@ -357,21 +359,7 @@ export default function Scoring() {
     return defaults;
   }, [dimensions, humanPresentationScore, humanCreativityScore, humanProcessScore, humanPerformanceScore]);
 
-  const handleExport = async () => {
-    try {
-      const response = await fetch('/api/scores/export');
-      if (!response.ok) throw new Error('导出失败');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `scores_export_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(err.message || '导出失败');
-    }
-  };
+  const handleExport = () => navigate('/results');
 
   return (
     <div className="space-y-4">

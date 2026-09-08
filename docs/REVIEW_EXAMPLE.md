@@ -14,6 +14,6 @@
 
 [200响应](examples/authoritative-result.json) · [409响应](examples/unresolved-blocked.json)
 
-分数和评语为预置，采用、锁定、结案与结果请求是实际操作，没有调用模型。任务仍停在 `export/pending`，普通 Excel 还没有接到权威结果链路。
+分数和评语为预置，采用、锁定、结案与结果请求是实际操作，没有调用模型。这份92分操作记录保留为早期复核证据。2026-09-08新增了同源Excel、Word和CSV导出；新的77分下载案例与复现步骤见[导出说明](EXPORTS.md)。下载不会自动改变任务的 `export/pending` 生命周期状态。
 
 这组记录用于检查人工决定如何生效。材料、模型效果和完整批量交付需要各自验证。[结果推导代码](../backend/services/result_derivation_service.py) · [相关测试](../tests/test_result_derivation.py)

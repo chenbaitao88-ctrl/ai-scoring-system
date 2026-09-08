@@ -45,7 +45,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen flex">
       {/* 侧边栏 */}
-      <aside className="w-56 bg-white border-r border-gray-200">
+      <aside className="hidden md:block w-56 shrink-0 bg-white border-r border-gray-200">
         <div className="h-16 flex items-center justify-center border-b border-gray-200 px-3">
           <h1 className="text-sm font-semibold text-teal-600 text-center leading-tight">{competitionName}</h1>
         </div>
@@ -87,13 +87,21 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* 主内容区 */}
-      <main className="flex-1">
+      <main className="flex-1 min-w-0">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-center px-6">
           <h1 className="text-lg font-bold text-teal-700 text-center">
             {competitionName}
           </h1>
         </header>
-        <div className="p-8 bg-gray-50 min-h-[calc(100vh-4rem)]">
+        <nav className="md:hidden bg-white border-b border-gray-200 px-3 py-2">
+          <label className="flex items-center gap-2 text-sm">
+            页面导航
+            <select aria-label="页面导航" value={location.pathname} onChange={event => navigate(event.target.value)} className="min-w-0 flex-1 border rounded p-2">
+              {[...menuItems, ...configItems].map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+        </nav>
+        <div className="p-3 sm:p-8 bg-gray-50 min-h-[calc(100vh-4rem)]">
           {children}
         </div>
       </main>

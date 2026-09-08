@@ -135,34 +135,16 @@ def test_export_score_summary_with_data(client, seed_teams_with_scores):
 
 
 # ---------------------------------------------------------------------------
-# 2. export Excel / Word (mock 文件生成)
+# 2. 旧导出不能绕过权威结果检查
 # ---------------------------------------------------------------------------
 
-def test_export_excel(client, db, temp_excel_file):
-    """GET /api/export/excel — 返回 Excel 文件响应"""
-    with patch("routers.export.build_excel_export") as mock_build:
-        mock_build.return_value = (temp_excel_file, "评分汇总表_20260101_120000.xlsx")
-        resp = client.get("/api/export/excel")
-        assert resp.status_code == 200
-        assert resp.headers["content-type"] == (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        # content-disposition 中中文被 URL 编码，解码后检查
-        cd = unquote(resp.headers.get("content-disposition", ""))
-        assert "评分汇总表" in cd
-
-
-def test_export_word(client, db, temp_word_file):
-    """GET /api/export/word — 返回 Word 文件响应"""
-    with patch("routers.export.build_word_export") as mock_build:
-        mock_build.return_value = (temp_word_file, "评分汇总表_20260101_120000.docx")
-        resp = client.get("/api/export/word")
-        assert resp.status_code == 200
-        assert resp.headers["content-type"] == (
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-        cd = unquote(resp.headers.get("content-disposition", ""))
-        assert "评分汇总表" in cd
+@pytest.mark.parametrize("url", ["/api/export/excel", "/api/export/word", "/api/scores/export"])
+def test_legacy_export_requires_authoritative_task(client, seed_teams_with_scores, url):
+    """Existing database scores cannot bypass task-scoped authority checks."""
+    resp = client.get(url)
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "EXPORT_TASK_REQUIRED"
+    assert "content-disposition" not in resp.headers
 
 
 # ---------------------------------------------------------------------------

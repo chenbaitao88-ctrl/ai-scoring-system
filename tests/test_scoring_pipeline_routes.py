@@ -185,6 +185,7 @@ def _formal_client(monkeypatch, tmp_path, *, item_error=None, config_setup=True)
     if config_setup:
         _write_empty_formal_config(config_dir)
     monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("SCORING_DATA_DIR", str(data_dir))
     monkeypatch.setattr(
         scoring_pipeline, "SCORING_PIPELINE_CONFIG_DIR", config_dir
     )

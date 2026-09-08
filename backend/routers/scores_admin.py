@@ -1,10 +1,12 @@
 """scores_admin.py - 评分运维路由"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import String
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import json
+from routers.result_export import get_authoritative_export_service, export_file_response
+from services.authoritative_export_service import AuthoritativeExportService
 from database import get_db, Team, MachineScore, HumanScore, FinalScore
 
 router = APIRouter()
@@ -322,77 +324,9 @@ async def calibrate_scores(
 
 
 @router.get("/export")
-def export_scores(db: Session = Depends(get_db)):
-    """
-    导出所有队伍的评分结果（CSV 格式）
-    """
-    import csv
-    import io
-    from fastapi.responses import StreamingResponse
-
-    teams = db.query(Team).options(
-        joinedload(Team.work),
-        joinedload(Team.machine_scores),
-        joinedload(Team.human_scores)
-    ).all()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    # 表头
-    headers = [
-        "编号", "队伍名称", "学校", "组别", "评审组",
-        "AI主题契合", "AI代码质量", "AI材料完整", "AIGC规范", "AI总分",
-        "人工产品表现力", "人工创意深度", "人工过程深度", "人工现场表现", "人工总分",
-        "综合分", "评分模式", "AI评语", "人工评语"
-    ]
-    writer.writerow(headers)
-
-    for team in teams:
-        machine_scores_list = team.machine_scores or []
-        machine = next((m for m in machine_scores_list if m.is_completed and m.is_adopted), None)
-        if not machine:
-            completed_scores = sorted([m for m in machine_scores_list if m.is_completed], key=lambda m: m.id, reverse=True)
-            machine = completed_scores[0] if completed_scores else None
-
-        human_list = team.human_scores or []
-        final_score = db.query(FinalScore).filter(FinalScore.team_id == team.id).first()
-
-        # 取最新的人工评分
-        latest_human = human_list[-1] if human_list else None
-
-        # AI 评语
-        ai_comment = machine.overall_comment if machine else ""
-
-        # 人工评语
-        human_comment = latest_human.comment if latest_human else ""
-
-        row = [
-            team.short_code,
-            team.team_name,
-            team.school or "",
-            team.group_type or "",
-            team.judge_group or "",
-            machine.ai_theme_score if machine else "",
-            machine.ai_code_quality_score if machine else "",
-            machine.ai_completeness_score if machine else "",
-            machine.ai_aigc_score if machine else "",
-            machine.ai_total_score if machine else "",
-            latest_human.human_presentation_score if latest_human else "",
-            latest_human.human_creativity_score if latest_human else "",
-            latest_human.human_process_score if latest_human else "",
-            latest_human.human_performance_score if latest_human else "",
-            latest_human.human_total_score if latest_human else (latest_human.total_score if latest_human else ""),
-            final_score.composite_score if final_score else "",
-            final_score.scoring_mode if final_score else "",
-            ai_comment,
-            human_comment,
-        ]
-        writer.writerow(row)
-
-    output.seek(0)
-    return StreamingResponse(
-        io.BytesIO(output.getvalue().encode('utf-8-sig')),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=scores_export.csv"}
-    )
+def export_scores(
+    task_id: Optional[str] = Query(default=None), item_id: Optional[List[str]] = Query(default=None),
+    service: AuthoritativeExportService = Depends(get_authoritative_export_service),
+):
+    """旧CSV地址也必须经过权威结果检查，不再回退到旧综合分。"""
+    return export_file_response(service, task_id, "csv", item_id)

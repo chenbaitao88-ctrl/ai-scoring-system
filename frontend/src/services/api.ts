@@ -300,13 +300,62 @@ export const exportApi = {
   getScoreSummary: () => api.get('/export/score-summary'),
 
   /** 导出Excel */
-  exportExcel: () => api.get('/export/excel', { responseType: 'blob' }),
+  exportExcel: (taskId: string) => api.get('/export/excel', { params: { task_id: taskId }, responseType: 'blob' }),
 
   /** 导出Word */
-  exportWord: () => api.get('/export/word', { responseType: 'blob' }),
+  exportWord: (taskId: string) => api.get('/export/word', { params: { task_id: taskId }, responseType: 'blob' }),
 
   /** 备份数据 */
   backupData: () => api.post('/export/backup'),
+};
+
+export interface ExportTask {
+  task_id: string;
+  batch_id: string;
+  total_items: number;
+  status: string;
+}
+
+export interface AuthoritativeExportRow {
+  item_id: string;
+  exportable: boolean;
+  authority_type?: string;
+  derivation_id?: string;
+  adoption_id?: string | null;
+  lock_id?: string | null;
+  result?: {
+    submission_id: string;
+    snapshot_id: string;
+    attempt_id: string;
+    total_score: number;
+    objective_score: number | null;
+    subjective_score: number | null;
+    dimension_scores: Array<{ dimension_code: string; score: number; min_score: number; max_score: number; score_range_ref: string }>;
+  };
+  error?: { code: string; reasons: Array<{ code: string }> };
+}
+
+export type AuthoritativeExportFormat = 'xlsx' | 'docx' | 'csv';
+
+export const authoritativeExportApi = {
+  tasks: () => api.get<{ items: ExportTask[] }, { items: ExportTask[] }>('/result-export/tasks'),
+  results: (taskId: string) => api.get<
+    { task_id: string; total_items: number; items: AuthoritativeExportRow[] },
+    { task_id: string; total_items: number; items: AuthoritativeExportRow[] }
+  >(`/result-export/tasks/${encodeURIComponent(taskId)}/results`),
+  download: async (taskId: string, itemIds: string[], format: AuthoritativeExportFormat, expectedDerivations: Record<string, string>): Promise<Blob> => {
+    if (itemIds.length === 0) throw new Error('请先选择导出条目。');
+    const response = await fetch(`/api/result-export/tasks/${encodeURIComponent(taskId)}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format, item_ids: itemIds, expected_derivations: expectedDerivations }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error?.message_key || '导出失败，请刷新结果并检查复核状态。');
+    }
+    return response.blob();
+  },
 };
 
 // ============ 评审组配置 ============

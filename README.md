@@ -20,7 +20,7 @@
 - **按版本记录评分过程：** 评分任务绑定输入与评价标准，保留每次尝试和结果快照。
 - **处理需要人工介入的情况：** 通过复核工单记录问题和处理决定，强制复核阻止自动采用。
 - **确认最终结果：** 采用具体评分版本，记录人工最终锁定，输出前检查仍未结案的阻断工单。
-- **查看与导出结果：** 提供结果列表和 Excel 导出；权威结果 API 返回评分版本和人工确认关系。两条出口的统一仍在待办中。
+- **导出已确认结果：** 按评分任务选择条目，Excel、Word、CSV统一读取已采用或人工锁定的结果；未结案、缺失记录和版本变化会阻止下载。文件保留分数来源与版本编号。
 
 ![AI Scoring System 复核工作台，合成示例数据](docs/screenshots/live-resolved.png)
 
@@ -57,6 +57,8 @@ bash scripts/stop_demo.command
 
 数据保存在被 Git 忽略的 runtime/demo/ 中。默认启动使用合成材料与预置评分，不调用模型。在线调用方式和新版流水线的配置限制见[模型与运行配置](docs/CONFIGURATION.md)。
 
+新建演示默认保留待处理状态。体验已确认结果的下载，见[导出操作与离线复现](docs/EXPORTS.md)。
+
 更详细的[运行手册](docs/RUNBOOK.md)包含端口、日志与故障处理。Intel Mac 也保留了[专用安装说明](docs/MACOS_INTEL.md)。
 
 ## 系统怎样组织
@@ -78,7 +80,7 @@ bash scripts/stop_demo.command
 | 评分过程怎样推进 | [任务管理](backend/services/pipeline_task_manager.py) · [评分编排](backend/services/scoring_pipeline_orchestrator.py) | [编排测试](tests/test_scoring_pipeline_orchestrator_dry_run.py) |
 | 怎样保留不同评分版本 | [评分事实存储](backend/services/score_attempt_store.py) | [存储测试](tests/test_score_attempt_store.py) |
 | 人工决定怎样生效 | [复核记录](backend/services/review_case_store.py) · [人工调整](backend/services/manual_adjustment_service.py) | [采用集成测试](tests/test_scoring_pipeline_review_application_integration.py) |
-| 哪个结果可以输出 | [权威结果推导](backend/services/result_derivation_service.py) | [结果推导测试](tests/test_result_derivation.py) |
+| 哪个结果可以输出 | [权威结果推导](backend/services/result_derivation_service.py) · [三格式导出](backend/services/authoritative_export_service.py) | [结果推导测试](tests/test_result_derivation.py) · [文件导出测试](tests/test_authoritative_file_export.py) |
 
 测试：
 
@@ -92,7 +94,6 @@ uv run --frozen python -m pytest -q -m "not slow"
 
 当前运行方式是单用户、本机、单后端实例。完整前后端、业务服务、测试和合成案例都在仓库中。
 
-- 将旧版综合评分 Excel 接到权威结果链路，统一下游结果来源。
 - 补齐新版流水线的在线执行运行时配置，完成真实 Provider 的端到端验证。
 - 改善状态与错误提示，减少用户在不同页面之间理解状态的成本。
 - 建立固定人工基准样本，评估模型评分一致性和人工修改情况。
