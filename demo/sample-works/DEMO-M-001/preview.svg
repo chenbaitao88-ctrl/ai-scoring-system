@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">城市无障碍出行助手界面预览</title>
+  <desc id="desc">包含虚构地图、推荐路线和无障碍提示的离线界面</desc>
+  <rect width="960" height="540" fill="#edf2f4"/>
+  <rect x="0" y="0" width="960" height="72" fill="#293241"/>
+  <text x="38" y="46" fill="#ffffff" font-family="sans-serif" font-size="27" font-weight="700">城市无障碍出行助手</text>
+  <text x="776" y="43" fill="#c9d5dd" font-family="sans-serif" font-size="14">虚构地图演示</text>
+  <rect x="32" y="102" width="600" height="404" rx="6" fill="#ffffff" stroke="#cbd5db"/>
+  <path d="M106 408 C180 330, 240 362, 302 282 S438 198, 552 148" fill="none" stroke="#7da0b2" stroke-width="13" stroke-linecap="round"/>
+  <path d="M106 408 C188 402, 280 430, 370 370 S496 276, 552 148" fill="none" stroke="#2f8f78" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="106" cy="408" r="13" fill="#293241"/><circle cx="370" cy="370" r="11" fill="#2f8f78"/><circle cx="552" cy="148" r="13" fill="#293241"/>
+  <text x="70" y="447" fill="#344750" font-family="sans-serif" font-size="15">文化广场</text>
+  <text x="330" y="402" fill="#344750" font-family="sans-serif" font-size="15">图书中心</text>
+  <text x="518" y="124" fill="#344750" font-family="sans-serif" font-size="15">社区展厅</text>
+  <rect x="664" y="102" width="264" height="404" rx="6" fill="#ffffff" stroke="#cbd5db"/>
+  <text x="692" y="142" fill="#293241" font-family="sans-serif" font-size="18" font-weight="700">推荐路线</text>
+  <text x="692" y="181" fill="#51646d" font-family="sans-serif" font-size="15">文化广场 → 图书中心</text>
+  <text x="692" y="212" fill="#51646d" font-family="sans-serif" font-size="15">图书中心 → 社区展厅</text>
+  <rect x="692" y="246" width="208" height="74" rx="6" fill="#e4f3ee"/>
+  <text x="712" y="276" fill="#256c5b" font-family="sans-serif" font-size="15" font-weight="700">无台阶 · 可使用电梯</text>
+  <text x="712" y="302" fill="#497268" font-family="sans-serif" font-size="14">演示距离约 320 米</text>
+  <text x="692" y="360" fill="#7c4d35" font-family="sans-serif" font-size="14">临时通道已关闭</text>
+  <text x="692" y="387" fill="#51646d" font-family="sans-serif" font-size="14">已自动避开台阶路段</text>
+  <rect x="692" y="430" width="208" height="46" rx="6" fill="#293241"/>
+  <text x="748" y="459" fill="#ffffff" font-family="sans-serif" font-size="15">查看路线说明</text>
+</svg>

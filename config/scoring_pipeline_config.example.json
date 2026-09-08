@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "execution_mode": "offline_demo",
+  "max_concurrency": 1,
+  "provider_binding": null,
+  "allow_live_provider": false
+}

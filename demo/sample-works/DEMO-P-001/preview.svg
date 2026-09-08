@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">校园节水小管家界面预览</title>
+  <desc id="desc">包含今日用水、趋势与节水提醒的虚构离线界面</desc>
+  <rect width="960" height="540" fill="#f5f8fb"/>
+  <rect width="960" height="76" fill="#126782"/>
+  <text x="42" y="48" fill="#ffffff" font-family="sans-serif" font-size="28" font-weight="700">校园节水小管家</text>
+  <text x="780" y="45" fill="#d9f0f4" font-family="sans-serif" font-size="15">离线演示数据</text>
+  <rect x="42" y="108" width="258" height="128" rx="8" fill="#ffffff" stroke="#d4e2e8"/>
+  <text x="66" y="142" fill="#39545f" font-family="sans-serif" font-size="16">三日累计用水</text>
+  <text x="66" y="195" fill="#126782" font-family="sans-serif" font-size="38" font-weight="700">1,012 L</text>
+  <rect x="326" y="108" width="258" height="128" rx="8" fill="#ffffff" stroke="#d4e2e8"/>
+  <text x="350" y="142" fill="#39545f" font-family="sans-serif" font-size="16">超量提醒</text>
+  <text x="350" y="195" fill="#cf5c36" font-family="sans-serif" font-size="38" font-weight="700">1 项</text>
+  <rect x="610" y="108" width="308" height="128" rx="8" fill="#ffffff" stroke="#d4e2e8"/>
+  <text x="634" y="142" fill="#39545f" font-family="sans-serif" font-size="16">今日行动</text>
+  <text x="634" y="178" fill="#2f6f49" font-family="sans-serif" font-size="18">午间检查洗手区水龙头</text>
+  <rect x="42" y="266" width="542" height="228" rx="8" fill="#ffffff" stroke="#d4e2e8"/>
+  <text x="66" y="304" fill="#263f49" font-family="sans-serif" font-size="18" font-weight="700">用水趋势</text>
+  <line x1="82" y1="448" x2="548" y2="448" stroke="#a9bbc2"/>
+  <polyline points="96,394 212,356 328,407 444,334 536,365" fill="none" stroke="#4aa6b5" stroke-width="6"/>
+  <circle cx="96" cy="394" r="6" fill="#126782"/><circle cx="212" cy="356" r="6" fill="#126782"/><circle cx="328" cy="407" r="6" fill="#126782"/><circle cx="444" cy="334" r="6" fill="#126782"/><circle cx="536" cy="365" r="6" fill="#126782"/>
+  <rect x="610" y="266" width="308" height="228" rx="8" fill="#ffffff" stroke="#d4e2e8"/>
+  <text x="634" y="304" fill="#263f49" font-family="sans-serif" font-size="18" font-weight="700">节水建议</text>
+  <text x="634" y="345" fill="#526a73" font-family="sans-serif" font-size="16">1. 随手关闭水龙头</text>
+  <text x="634" y="382" fill="#526a73" font-family="sans-serif" font-size="16">2. 清晨进行绿化浇水</text>
+  <text x="634" y="419" fill="#526a73" font-family="sans-serif" font-size="16">3. 连续记录后再调基线</text>
+</svg>
